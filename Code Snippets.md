@@ -108,3 +108,83 @@ print(results_ramona.summary())
 ![SARIMA Results](https://github.com/haschuele/EnergyDM/blob/main/SARIMA%20Results.png)
 
 # Quantile Forecast with NOAA Anomaly Detection
+```python
+# Plot quantile forecasts with orange dots when NOAA forecasted HSI > p70 HSI
+
+# Create a figure
+plt.figure(figsize=(10, 6))
+
+# Plot p20 and p70 as blue/red lines
+plt.plot(mariposa_quant_forecast.index, mariposa_quant_forecast['p10'], label='p10', color='blue', linewidth=0.2)
+plt.plot(mariposa_quant_forecast.index, mariposa_quant_forecast['p90'], label='p90', color='red', linewidth=0.2)
+
+# Black line for p50 (median)
+plt.plot(mariposa_quant_forecast.index, mariposa_quant_forecast['p50'], label='p50', color='black', linewidth=0.2)
+
+# Merge the two DataFrames on the common index
+merged_df = mariposa_quant_forecast.merge(mariposa_noaa_anom, left_index=True, right_index=True, suffixes=('_forecast', '_noaa'))
+merged_df
+
+# Overlay orange dots where HSI > p70
+condition = merged_df['HSI'] > merged_df['p90']
+plt.scatter(merged_df.index[condition], merged_df['HSI'][condition], c='orange', label='HSI > p90')
+
+# Add labels and legend
+first_date = str(mariposa_quant_forecast.index[0])
+last_date = str(mariposa_quant_forecast.index[-1])
+plt.xlabel('Time')
+plt.ylabel('HSI')
+plt.title(f'{first_date} through {last_date}')
+plt.suptitle('Line Plot of p10, p50, and p90 Quantiles with HSI > p90 as Orange Dots')
+plt.legend()
+
+# Show the plot
+plt.grid(True)
+plt.show()
+```
+![Quantile Anomaly Detection](https://github.com/haschuele/EnergyDM/blob/main/Quantile%20Anomaly%20Detection.png)
+
+# Time Series Decomposition with Percentile Anomaly Detection
+```python
+# Define sine function
+# TO DO compare this to np.sin()
+# amplitude (A), angular frequency (omega), phase (phi), and the vertical shift (c).
+
+# Amplitude (A): The amplitude parameter (A) determines the height of the peaks and the depth of the troughs in the seasonal cycle. It reflects the extent to which the data values deviate from the mean.
+# Frequency (Omega): The angular frequency parameter (omega) controls how many oscillations occur within a given time interval. It defines the length of the seasonal cycle, with higher values leading to shorter cycles and more oscillations.
+# Phase (Phi): The phase parameter (phi) indicates the horizontal shift or offset of the seasonal cycle. It determines where the cycle begins in time.
+# Vertical Shift (C): The vertical shift parameter (c) represents a constant value that is added to the sine function. It sets the baseline or average level of the seasonal cycle.
+
+# OBSERVATION Sine is unable to capture seasonality of longer periods of time (e.g. a few months) because it's too complex
+
+def sine_func(x, A, omega, phi, c):
+    return A * np.sin(omega * x + phi) + c
+
+# Fit sine function to data
+x_data = np.arange(len(ramona_df))  # Index or time values
+y_data = ramona_df["HSI"].values  # Your time series data
+
+# params, params_covariance = curve_fit(sine_func, x_data, y_data)
+params, params_covariance = curve_fit(sine_func, x_data, y_data, p0=[0.75, 0.3, 0, 0]) # With initial parameter estimates
+A, omega, phi, c = params  # Extract the fitted parameters
+
+
+# NOTES
+# The fitted seasonal cycle should exhibit similar characteristics to the original data, such as the frequency and amplitude of the seasonal patterns.
+# It should provide a smooth and continuous representation of the seasonal component, helping to remove noise and emphasize the underlying trends.
+
+# Generate seasonal cycle using fitted parameters
+seasonal_cycle = sine_func(x_data, A, omega, phi, c)
+
+# Plot original and fitted series
+plt.figure(figsize=(12, 6))
+plt.plot(ramona_df['time'].values, y_data, label='Original Data', color='blue')
+plt.plot(ramona_df['time'].values, seasonal_cycle, label='Fitted Seasonal Cycle', color='red')
+plt.xlabel('Time')  # Use 'Time' as the x-axis label
+plt.ylabel('Value')
+plt.title('Fitted Seasonal Cycle using Sine Function')
+plt.legend()
+plt.grid(True)
+plt.show()
+```
+![Sinusoidal Seasonal Fit](https://github.com/haschuele/EnergyDM/blob/main/Sinusoidal%20Fit.png)
